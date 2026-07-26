@@ -12,12 +12,23 @@ fn main() -> color_eyre::Result<()> {
 }
 fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
     let mut cube = Mesh3d::cube();
+    let mut animation_interrupted = false;
     loop {
-        cube.change_rotation_z(0.02);
+        if !animation_interrupted {
+            cube.change_rotation_z(0.02);
+        }
         terminal.draw(|frame| render(frame, &cube))?;
-        if event::poll(Duration::from_millis(16))? {
+        if event::poll(Duration::from_millis(8))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
+                    KeyCode::Char('a') => {
+                        animation_interrupted = true;
+                        cube.change_rotation_z(-0.02);
+                    }
+                    KeyCode::Char('d') => {
+                        animation_interrupted = true;
+                        cube.change_rotation_z(0.02);
+                    }
                     KeyCode::Char('q') => break Ok(()),
                     _ => {}
                 }
@@ -37,7 +48,7 @@ impl Mesh3d {
     fn cube() -> Self {
         Self {
             position: (0., 2.8, -0.2),
-            rotation: (0., 0., 0.),
+            rotation: (0.6, 0.6, 0.),
             scale: (1., 1., 1.),
             coords: Vec::from([
                 (1., -1., 1.),
@@ -62,13 +73,27 @@ impl Mesh3d {
     fn change_rotation_z(&mut self, amount: f64) {
         self.rotation.2 += amount;
     }
-    fn rotate_z(&self, angle: f64) -> Vec<(f64, f64, f64)> {
+    fn rotate(&self, angles: (f64, f64, f64)) -> Vec<(f64, f64, f64)> {
         self.coords
             .iter()
             .map(|c| {
                 (
-                    c.0 * angle.cos() - c.1 * angle.sin(),
-                    c.0 * angle.sin() + c.1 * angle.cos(),
+                    c.0,
+                    c.1 * angles.0.cos() - c.2 * angles.0.sin(),
+                    c.1 * angles.0.sin() + c.2 * angles.0.cos(),
+                )
+            })
+            .map(|c| {
+                (
+                    c.0 * angles.1.cos() - c.2 * angles.1.sin(),
+                    c.1,
+                    c.0 * angles.1.sin() + c.2 * angles.1.cos(),
+                )
+            })
+            .map(|c| {
+                (
+                    c.0 * angles.2.cos() - c.1 * angles.2.sin(),
+                    c.0 * angles.2.sin() + c.1 * angles.2.cos(),
                     c.2,
                 )
             })
@@ -76,7 +101,7 @@ impl Mesh3d {
     }
     fn get_render_data(&self) -> RenderData {
         let coords: Vec<(f64, f64)> = self
-            .rotate_z(self.rotation.2)
+            .rotate(self.rotation)
             .iter_mut()
             .map(|c| {
                 (
